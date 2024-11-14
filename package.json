@@ -1,0 +1,33 @@
+{
+    "name": "snowflake-cloudflare-worker",
+    "version": "1.0.0",
+    "description": "Distributed unique ID generator using the Snowflake algorithm",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist/**/*",
+        "README.md"
+    ],
+    "scripts": {
+        "test": "vitest",
+        "clean": "rm -rf dist",
+        "build": "npm run clean && tsc",
+        "prepare": "npm run build",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "snowflake id",
+        "id",
+        "distributed",
+        "unique",
+        "identifier"
+    ],
+    "author": "Connor Wang",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.17.6",
+        "@vitest/coverage-v8": "^2.1.5",
+        "typescript": "^5.3.3",
+        "vitest": "^2.1.5"
+    }
+}
