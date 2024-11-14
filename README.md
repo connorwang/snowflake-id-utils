@@ -62,10 +62,10 @@ const snowflake = new Snowflake("175928847299117063");
 // Get creation timestamp
 const timestamp = snowflake.getTimestamp();
 
-// Get worker ID (0-8191)
+// Get worker ID (0-4095)
 const workerId = snowflake.getWorkerId();
 
-// Get sequence number (0-511)
+// Get sequence number (0-1023)
 const sequence = snowflake.getSequence();
 
 // Get all components at once
