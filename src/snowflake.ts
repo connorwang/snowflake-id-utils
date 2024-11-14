@@ -9,20 +9,13 @@ export const EPOCH = 1714857600000;
 export let allowUnquoted = false;
 
 /**
- * Error thrown when timestamp is before Discord epoch
- */
-export class InvalidTimestampError extends Error {
-    constructor(timestamp: number) {
-        super(`Timestamp ${timestamp} is before epoch (${EPOCH})`);
-        this.name = "InvalidTimestampError";
-    }
-}
-
-/**
  * Represents a Snowflake ID with utility methods
  */
 export class Snowflake {
     private readonly id: bigint;
+    private static lastTimestamp = -1n;
+    private static sequence = 0;
+    private static readonly MAX_SEQUENCE = 1023; // 10 bits max value
 
     /**
      * Creates a new Snowflake instance
@@ -41,18 +34,39 @@ export class Snowflake {
     }
 
     /**
-     * Creates a new Snowflake from a timestamp
+     * Creates a new Snowflake from a timestamp with specific worker ID
      * @param timestamp - Date object or timestamp in milliseconds
-     * @throws {InvalidTimestampError} If timestamp is before epoch
+     * @param workerId - Worker ID (0-4095)
      */
-    static fromTimestamp(timestamp: Date | number): Snowflake {
+    static fromTimestamp(timestamp: Date | number, workerId: number = 0): Snowflake {
         const ms = typeof timestamp === "number" ? timestamp : timestamp.getTime();
 
-        if (ms < EPOCH) {
-            throw new InvalidTimestampError(ms);
-        }
+        // Get current timestamp
+        const currentTimestamp = BigInt(ms - EPOCH);
 
-        return new Snowflake(BigInt(ms - EPOCH) << BigInt(22));
+        // If we're still in the same millisecond
+        if (currentTimestamp === this.lastTimestamp) {
+            this.sequence = (this.sequence + 1) & this.MAX_SEQUENCE;
+            // Sequence overflow - wait for next millisecond
+            if (this.sequence === 0) {
+                // Wait until next millisecond
+                while (BigInt(Date.now() - EPOCH) <= this.lastTimestamp) {
+                    // busy wait
+                }
+            }
+        } else {
+            // New millisecond - reset sequence
+            this.sequence = 0;
+        }
+        this.lastTimestamp = currentTimestamp;
+
+        // Compose the snowflake
+        // timestamp: 42 bits | worker: 12 bits | sequence: 10 bits
+        const timestampBits = currentTimestamp << BigInt(22);  // shift left by 12 + 10 bits
+        const workerBits = BigInt(workerId) << BigInt(10);    // shift left by 10 bits
+        const sequenceBits = BigInt(this.sequence);           // no shift needed
+        
+        return new Snowflake(timestampBits | workerBits | sequenceBits);
     }
 
     /**
@@ -69,8 +83,8 @@ export class Snowflake {
      * Parse a string into a Snowflake
      * @param str - String to parse
      */
-    static parse(str: string): Snowflake {
-        return new Snowflake(str);
+    static parse(value: string): Snowflake {
+        return new Snowflake(value);
     }
 
     /**
@@ -91,14 +105,15 @@ export class Snowflake {
      * Get the timestamp when this Snowflake was created
      */
     getTimestamp(): Date {
-        return new Date(Number(this.id >> BigInt(22)) + EPOCH);
+        const timestamp = Number(this.id >> BigInt(22)) + EPOCH;
+        return new Date(timestamp);
     }
 
     /**
      * Get the worker ID from this Snowflake
      */
     getWorkerId(): number {
-        return Number((this.id & BigInt(0x3e0000)) >> BigInt(17));
+        return Number((this.id >> BigInt(10)) & BigInt(0xFFF));  // 12 bits mask
     }
 
     /**
@@ -112,7 +127,7 @@ export class Snowflake {
      * Get the increment sequence from this Snowflake
      */
     getSequence(): number {
-        return Number(this.id & BigInt(0xfff));
+        return Number(this.id & BigInt(0x3FF));  // 10 bits mask
     }
 
     /**
@@ -122,8 +137,7 @@ export class Snowflake {
         return {
             timestamp: this.getTimestamp(),
             workerId: this.getWorkerId(),
-            processId: this.getProcessId(),
-            sequence: this.getSequence(),
+            sequence: this.getSequence()
         };
     }
 }
@@ -134,6 +148,5 @@ export class Snowflake {
 export interface DeconstructedSnowflake {
     timestamp: Date;
     workerId: number;
-    processId: number;
     sequence: number;
 }

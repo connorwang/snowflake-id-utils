@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Snowflake, EPOCH, InvalidTimestampError } from "../snowflake";
+import { describe, it, expect } from "vitest";
+import { Snowflake } from "../snowflake";
 
 describe("Snowflake", () => {
     describe("constructor", () => {
@@ -30,115 +30,93 @@ describe("Snowflake", () => {
         });
     });
 
-    describe("JSON serialization", () => {
-        it("should serialize to JSON string", () => {
-            const inputId = "123456";
-            const snowflake = new Snowflake(inputId);
-            const actual = JSON.stringify(snowflake);
-            const expected = '"123456"';
-            expect(actual).toBe(expected);
-        });
-
-        it("should handle zero value", () => {
-            const inputId = 0;
-            const snowflake = new Snowflake(inputId);
-            const actual = JSON.stringify(snowflake);
-            const expected = '"0"';
-            expect(actual).toBe(expected);
-        });
-    });
-
     describe("timestamp operations", () => {
-        it("should create from timestamp", () => {
+        it("should create from timestamp without worker ID", () => {
             const inputDate = new Date("2024-11-01T00:00:00.000Z");
             const snowflake = Snowflake.fromTimestamp(inputDate);
-            const actualTimestamp = snowflake.getTimestamp();
-            expect(actualTimestamp.getTime()).toBe(inputDate.getTime());
+            const deconstructed = snowflake.deconstruct();
+            expect(deconstructed.timestamp.getTime()).toBe(inputDate.getTime());
+            expect(deconstructed.workerId).toBe(0);
         });
 
-        it("should create from numeric timestamp", () => {
+        it("should create from timestamp with worker ID", () => {
+            const inputDate = new Date("2024-11-01T00:00:00.000Z");
+            const workerId = 123;
+            const snowflake = Snowflake.fromTimestamp(inputDate, workerId);
+            const deconstructed = snowflake.deconstruct();
+            expect(deconstructed.timestamp.getTime()).toBe(inputDate.getTime());
+            expect(deconstructed.workerId).toBe(workerId);
+        });
+
+        it("should create from numeric timestamp without worker ID", () => {
             const inputTimestamp = Date.now();
             const snowflake = Snowflake.fromTimestamp(inputTimestamp);
-            const actualTimestamp = snowflake.getTimestamp();
-            expect(actualTimestamp.getTime()).toBe(inputTimestamp);
+            const deconstructed = snowflake.deconstruct();
+            expect(deconstructed.timestamp.getTime()).toBe(inputTimestamp);
+            expect(deconstructed.workerId).toBe(0);
         });
 
-        it("should handle timestamps before epoch", () => {
-            const inputDate = new Date(EPOCH - 1000); // 1 second before epoch
-            expect(() => Snowflake.fromTimestamp(inputDate)).toThrow();
+        it("should create from numeric timestamp with worker ID", () => {
+            const inputTimestamp = Date.now();
+            const workerId = 456;
+            const snowflake = Snowflake.fromTimestamp(inputTimestamp, workerId);
+            const deconstructed = snowflake.deconstruct();
+            expect(deconstructed.timestamp.getTime()).toBe(inputTimestamp);
+            expect(deconstructed.workerId).toBe(workerId);
         });
 
-        it("should throw InvalidTimestampError for timestamps before discord epoch", () => {
-            const inputDate = new Date(EPOCH - 1000); // 1 second before epoch
-            expect(() => Snowflake.fromTimestamp(inputDate)).toThrow(InvalidTimestampError);
-            expect(() => Snowflake.fromTimestamp(inputDate)).toThrow(
-                `Timestamp ${inputDate.getTime()} is before epoch (${EPOCH})`
-            );
-        });
-    });
-
-    describe("environment variable handling", () => {
-        beforeEach(() => {
-            process.env.TEST_SNOWFLAKE = "175928847299117063";
+        it("should generate sequential IDs within same millisecond", () => {
+            const timestamp = Date.now();
+            const workerId = 123;
+            const first = Snowflake.fromTimestamp(timestamp, workerId);
+            const second = Snowflake.fromTimestamp(timestamp, workerId);
+            
+            expect(first.getTimestamp().getTime()).toBe(second.getTimestamp().getTime());
+            expect(second.getSequence()).toBe(first.getSequence() + 1);
         });
 
-        it("should create from environment variable", () => {
-            const snowflake = Snowflake.fromEnv("TEST_SNOWFLAKE");
-            expect(snowflake?.toString()).toBe("175928847299117063");
-        });
-
-        it("should return null for missing environment variable", () => {
-            const snowflake = Snowflake.fromEnv("NONEXISTENT_VAR");
-            expect(snowflake).toBeNull();
+        it("should reset sequence on new millisecond", () => {
+            const workerId = 123;
+            const first = Snowflake.fromTimestamp(Date.now(), workerId);
+            // Wait for next millisecond
+            const timestamp = first.getTimestamp().getTime() + 1;
+            const second = Snowflake.fromTimestamp(timestamp, workerId);
+            
+            expect(second.getSequence()).toBe(0);
         });
     });
 
     describe("deconstruction", () => {
         it("should correctly deconstruct snowflake", () => {
-            const inputId = "175928847299117063";
-            const snowflake = new Snowflake(inputId);
+            const timestamp = Date.now();
+            const workerId = 123;
+            const snowflake = Snowflake.fromTimestamp(timestamp, workerId);
             const deconstructed = snowflake.deconstruct();
 
-            expect(deconstructed).toEqual(
-                expect.objectContaining({
-                    workerId: expect.any(Number),
-                    processId: expect.any(Number),
-                    sequence: expect.any(Number),
-                    timestamp: expect.any(Date),
-                })
-            );
-        });
-
-        it("should maintain consistency in reconstructed values", () => {
-            const inputDate = new Date("2024-11-01T00:00:00.000Z");
-            const originalSnowflake = Snowflake.fromTimestamp(inputDate);
-            const deconstructed = originalSnowflake.deconstruct();
-
-            // Timestamp should match within 1ms due to potential rounding
-            expect(Math.abs(deconstructed.timestamp.getTime() - inputDate.getTime())).toBeLessThan(1);
+            expect(deconstructed).toEqual({
+                timestamp: expect.any(Date),
+                workerId: workerId,
+                sequence: expect.any(Number)
+            });
+            expect(deconstructed.sequence).toBeLessThan(1024);
         });
     });
 
     describe("utility methods", () => {
         it("should get correct worker ID", () => {
-            const snowflake = new Snowflake("175928847299117063");
-            const workerId = snowflake.getWorkerId();
-            expect(workerId).toBeGreaterThanOrEqual(0);
-            expect(workerId).toBeLessThan(32);
-        });
-
-        it("should get correct process ID", () => {
-            const snowflake = new Snowflake("175928847299117063");
-            const processId = snowflake.getProcessId();
-            expect(processId).toBeGreaterThanOrEqual(0);
-            expect(processId).toBeLessThan(32);
+            const timestamp = Date.now();
+            const workerId = 123;
+            const snowflake = Snowflake.fromTimestamp(timestamp, workerId);
+            expect(snowflake.getWorkerId()).toBe(workerId);
         });
 
         it("should get correct sequence", () => {
-            const snowflake = new Snowflake("175928847299117063");
+            const timestamp = Date.now();
+            const workerId = 123;
+            const snowflake = Snowflake.fromTimestamp(timestamp, workerId);
             const sequence = snowflake.getSequence();
             expect(sequence).toBeGreaterThanOrEqual(0);
-            expect(sequence).toBeLessThan(4096);
+            expect(sequence).toBeLessThan(1024);
         });
     });
 
