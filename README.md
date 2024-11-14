@@ -8,7 +8,7 @@ A TypeScript utility for working with Snowflake IDs with Cloudflare Workers comp
 -   🚀 Zero dependencies
 -   💪 Proper BigInt handling for ID operations
 -   🔒 Type-safe API
--   ✨ Modern ES2020 target
+-   ✨ Cloudflare Worker Support
 -   📦 Small bundle size
 
 ## Installation
