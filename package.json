@@ -1,6 +1,6 @@
 {
     "name": "snowflake-id-utils",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Distributed unique ID generator using the Snowflake algorithm. Support serverless like Cloudflare Workers",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

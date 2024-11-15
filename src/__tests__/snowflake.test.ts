@@ -73,6 +73,7 @@ describe("Snowflake", () => {
             
             expect(first.getTimestamp().getTime()).toBe(second.getTimestamp().getTime());
             expect(second.getSequence()).toBe(first.getSequence() + 1);
+            expect(second.getSequence()).toBeLessThan(1024);
         });
 
         it("should reset sequence on new millisecond", () => {
@@ -83,6 +84,19 @@ describe("Snowflake", () => {
             const second = Snowflake.fromTimestamp(timestamp, workerId);
             
             expect(second.getSequence()).toBe(0);
+        });
+
+        it("should handle maximum sequence within millisecond", () => {
+            const timestamp = Date.now();
+            const workerId = 123;
+            let lastSnowflake = Snowflake.fromTimestamp(timestamp, workerId);
+            
+            // Generate 1023 more snowflakes (for total of 1024)
+            for (let i = 0; i < 1023; i++) {
+                lastSnowflake = Snowflake.fromTimestamp(timestamp, workerId);
+            }
+            
+            expect(lastSnowflake.getSequence()).toBe(1023);
         });
     });
 
@@ -99,6 +113,7 @@ describe("Snowflake", () => {
                 sequence: expect.any(Number)
             });
             expect(deconstructed.sequence).toBeLessThan(1024);
+            expect(deconstructed.workerId).toBeLessThan(2048);
         });
     });
 
@@ -117,6 +132,13 @@ describe("Snowflake", () => {
             const sequence = snowflake.getSequence();
             expect(sequence).toBeGreaterThanOrEqual(0);
             expect(sequence).toBeLessThan(1024);
+        });
+
+        it("should handle maximum worker ID", () => {
+            const timestamp = Date.now();
+            const maxWorkerId = 2047;
+            const snowflake = Snowflake.fromTimestamp(timestamp, maxWorkerId);
+            expect(snowflake.getWorkerId()).toBe(maxWorkerId);
         });
     });
 

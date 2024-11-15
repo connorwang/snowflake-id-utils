@@ -1,8 +1,8 @@
 /**
- * Epoch in milliseconds (2024-01-01T00:00:00.000Z)
+ * Epoch in milliseconds (2023-01-01T00:00:00.000Z)
+ * Adjusted to be divisible by 10 for clean 1ms units
  */
-export const EPOCH = 1714857600000;
-
+export const EPOCH = 1672502400000;
 /**
  * Configuration for allowing unquoted snowflake IDs in JSON
  */
@@ -36,12 +36,10 @@ export class Snowflake {
     /**
      * Creates a new Snowflake from a timestamp with specific worker ID
      * @param timestamp - Date object or timestamp in milliseconds
-     * @param workerId - Worker ID (0-4095)
+     * @param workerId - Worker ID (0-2047)
      */
     static fromTimestamp(timestamp: Date | number, workerId: number = 0): Snowflake {
         const ms = typeof timestamp === "number" ? timestamp : timestamp.getTime();
-
-        // Get current timestamp
         const currentTimestamp = BigInt(ms - EPOCH);
 
         // If we're still in the same millisecond
@@ -61,8 +59,8 @@ export class Snowflake {
         this.lastTimestamp = currentTimestamp;
 
         // Compose the snowflake
-        // timestamp: 42 bits | worker: 12 bits | sequence: 10 bits
-        const timestampBits = currentTimestamp << BigInt(22);  // shift left by 12 + 10 bits
+        // timestamp: 42 bits | worker: 11 bits | sequence: 10 bits
+        const timestampBits = currentTimestamp << BigInt(21);  // shift left by 11 + 10 bits
         const workerBits = BigInt(workerId) << BigInt(10);    // shift left by 10 bits
         const sequenceBits = BigInt(this.sequence);           // no shift needed
         
@@ -105,7 +103,7 @@ export class Snowflake {
      * Get the timestamp when this Snowflake was created
      */
     getTimestamp(): Date {
-        const timestamp = Number(this.id >> BigInt(22)) + EPOCH;
+        const timestamp = Number(this.id >> BigInt(21)) + EPOCH;
         return new Date(timestamp);
     }
 
@@ -113,7 +111,7 @@ export class Snowflake {
      * Get the worker ID from this Snowflake
      */
     getWorkerId(): number {
-        return Number((this.id >> BigInt(10)) & BigInt(0xFFF));  // 12 bits mask
+        return Number((this.id >> BigInt(10)) & BigInt(0x7FF));  // 11 bits mask
     }
 
     /**

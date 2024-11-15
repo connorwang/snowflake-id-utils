@@ -138,16 +138,19 @@ if (id) {
 
 ### Snowflake Structure
 
-This particular implementation of Snowflake ID is a 64-bit integer with the following structure:
+This implementation of Snowflake ID is a 63-bit integer with the following structure:
 
 ```
-111111111111111111111111111111111111111111 111111111111 1111111111
-64                                         22           10         0
+111111111111111111111111111111111111111111 11111111111 1111111111
+63                                         21          10         0
 ```
 
--   Timestamp (42 bits): Milliseconds since Epoch (2024-01-01)
--   Worker ID (12 bits): Worker ID (0-4095)
+-   Timestamp (42 bits): Milliseconds since Epoch (2023-01-01)
+    -   Provides ~139 years of unique timestamps
+-   Worker ID (11 bits): Worker ID (0-2047)
+    -   Supports 2,048 unique workers
 -   Sequence (10 bits): Sequence number (0-1023)
+    -   Allows 1,024 unique IDs per millisecond per worker
 
 ## Contributing
 
